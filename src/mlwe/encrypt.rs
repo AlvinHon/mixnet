@@ -4,13 +4,13 @@ use crate::mlwe::{MlweCiphertext, sample_poly_b_eta};
 
 /// MLWE public key type
 pub struct MlwePublicKey<const Q: i64, const N: usize> {
-    pub a: Polynomial<ZqI64<Q>, N>,
-    pub b: Polynomial<ZqI64<Q>, N>,
+    pub(crate) a: Polynomial<ZqI64<Q>, N>,
+    pub(crate) b: Polynomial<ZqI64<Q>, N>,
 }
 
 impl<const Q: i64, const N: usize> MlwePublicKey<Q, N> {
     /// MLWE encryption: encrypts binary message m
-    pub fn mlwe_encrypt(&self, m: &Polynomial<ZqI64<Q>, N>, eta: usize) -> MlweCiphertext<Q, N> {
+    pub fn encrypt(&self, m: &Polynomial<ZqI64<Q>, N>, eta: usize) -> MlweCiphertext<Q, N> {
         let m_enc = Self::encode_message(m);
         let r = sample_poly_b_eta::<Q, N>(eta);
         let e1 = sample_poly_b_eta::<Q, N>(eta);

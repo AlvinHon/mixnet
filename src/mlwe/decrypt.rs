@@ -3,12 +3,12 @@ use poly_ring_xnp1::{Polynomial, zq::ZqI64};
 
 /// MLWE secret key type
 pub struct MlweSecretKey<const Q: i64, const N: usize> {
-    pub s: Polynomial<ZqI64<Q>, N>,
+    pub(crate) s: Polynomial<ZqI64<Q>, N>,
 }
 
 impl<const Q: i64, const N: usize> MlweSecretKey<Q, N> {
     /// MLWE decryption: recovers binary message m
-    pub fn mlwe_decrypt(&self, ct: &MlweCiphertext<Q, N>) -> Polynomial<ZqI64<Q>, N> {
+    pub fn decrypt(&self, ct: &MlweCiphertext<Q, N>) -> Polynomial<ZqI64<Q>, N> {
         let p = ct.v.clone() - self.s.clone() * ct.u.clone();
         Self::decode_message(&p)
     }

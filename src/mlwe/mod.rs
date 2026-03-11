@@ -8,8 +8,7 @@ pub mod encrypt;
 pub use encrypt::MlwePublicKey;
 
 use crate::preliminaries::algebra::sample_b_eta;
-use poly_ring_xnp1::Polynomial;
-use poly_ring_xnp1::zq::ZqI64;
+use poly_ring_xnp1::{Polynomial, zq::ZqI64};
 use rand::RngExt;
 
 /// Key generation for MLWE
@@ -54,8 +53,8 @@ mod tests {
             ZqI64::new(0),
         ]);
         let (pk, sk) = keygen::<Q, N>(eta);
-        let ct = pk.mlwe_encrypt(&m, eta);
-        let m_rec = sk.mlwe_decrypt(&ct);
+        let ct = pk.encrypt(&m, eta);
+        let m_rec = sk.decrypt(&ct);
         for (a, b) in m.iter().zip(m_rec.iter()) {
             assert_eq!(a, b);
         }
