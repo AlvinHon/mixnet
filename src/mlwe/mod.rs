@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn mlwe_encrypt_decrypt_roundtrip() {
         let mut rng = rand::rng();
-        const Q: i64 = 3019;
+        const Q: i64 = 3109;
         const N: usize = 512;
         let eta = 2;
         // Binary message
