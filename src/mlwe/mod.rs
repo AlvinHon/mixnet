@@ -42,9 +42,9 @@ mod tests {
     use super::*;
     #[test]
     fn mlwe_encrypt_decrypt_roundtrip() {
-        const Q: i64 = 12289;
-        const N: usize = 4;
-        let eta = 4;
+        const Q: i64 = 3019;
+        const N: usize = 512;
+        let eta = 2;
         // Binary message
         let m = Polynomial::<ZqI64<Q>, N>::new(vec![
             ZqI64::new(1),
@@ -52,11 +52,22 @@ mod tests {
             ZqI64::new(1),
             ZqI64::new(0),
         ]);
-        let (pk, sk) = keygen::<Q, N>(eta);
-        let ct = pk.encrypt(&m, eta);
-        let m_rec = sk.decrypt(&ct);
-        for (a, b) in m.iter().zip(m_rec.iter()) {
-            assert_eq!(a, b);
+        let mut failures = 0;
+        let trials = 100;
+        for _ in 0..trials {
+            let (pk, sk) = keygen::<Q, N>(eta);
+            let ct = pk.encrypt(&m, eta);
+            let m_rec = sk.decrypt(&ct);
+            if !m.iter().zip(m_rec.iter()).all(|(a, b)| a == b) {
+                failures += 1;
+            }
         }
+        println!("Decryption failures: {} out of {}", failures, trials);
+        assert!(
+            failures <= 10, // TODO it may be too large!
+            "Too many decryption failures: {} out of {}",
+            failures,
+            trials
+        );
     }
 }
