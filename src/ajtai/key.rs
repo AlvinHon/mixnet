@@ -1,5 +1,4 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
-use rand::RngExt;
 
 use crate::ajtai::{commitment::AjtaiCommitment, opening::AjtaiCommitmentOpening};
 
@@ -11,11 +10,11 @@ pub struct AjtaiCommitmentKey<const Q: i64, const N: usize, const T: usize, cons
 
 impl<const Q: i64, const N: usize, const T: usize, const M: usize> AjtaiCommitmentKey<Q, N, T, M> {
     /// Commit to message m (vector of t polynomials), returns (commitment, opening)
-    pub fn commit(
+    pub fn commit<R: rand::RngExt + ?Sized>(
         &self,
         m: &[Polynomial<ZqI64<Q>, N>; T],
+        rng: &mut R,
     ) -> (AjtaiCommitment<Q, N>, AjtaiCommitmentOpening<Q, N, M>) {
-        let mut rng = rand::rng();
         let mut r = Vec::with_capacity(M);
         for _ in 0..M {
             let coeffs = (0..N).map(|_| ZqI64::new(rng.random_range(0..Q))).collect();

@@ -1,5 +1,4 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
-use rand::RngExt;
 
 /// Constructs the gadget matrix G = I_n ⊗ [1, 2, ..., 2^{k-1}] as a vector of vectors.
 /// Returns a Vec<Vec<i64>> of shape (n, k).
@@ -68,8 +67,7 @@ pub fn is_bin<const Q: i64, const N: usize>(poly: &Polynomial<ZqI64<Q>, N>) -> b
 
 /// Sample from the centered binomial distribution B_eta for integer eta > 0.
 /// Returns a ZqI64<Q> sample.
-pub fn sample_b_eta<const Q: i64>(eta: usize) -> ZqI64<Q> {
-    let mut rng = rand::rng();
+pub fn sample_b_eta<const Q: i64, R: rand::RngExt + ?Sized>(eta: usize, rng: &mut R) -> ZqI64<Q> {
     let mut sum = 0i64;
     for _ in 0..eta {
         let a: i64 = rng.random_range(0..=1);
@@ -236,9 +234,12 @@ mod tests {
 
     #[test]
     fn b_eta_mean_is_zeroish() {
+        let mut rng = rand::rng();
         const Q: i64 = 12289;
         let eta = 8;
-        let samples: Vec<_> = (0..10000).map(|_| sample_b_eta::<Q>(eta)).collect();
+        let samples: Vec<_> = (0..10000)
+            .map(|_| sample_b_eta::<Q, _>(eta, &mut rng))
+            .collect();
         let mean: f64 = samples
             .iter()
             .map(|x| i64::from(x.clone()) as f64)

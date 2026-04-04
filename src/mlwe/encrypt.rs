@@ -10,11 +10,16 @@ pub struct MlwePublicKey<const Q: i64, const N: usize> {
 
 impl<const Q: i64, const N: usize> MlwePublicKey<Q, N> {
     /// MLWE encryption: encrypts binary message m
-    pub fn encrypt(&self, m: &Polynomial<ZqI64<Q>, N>, eta: usize) -> MlweCiphertext<Q, N> {
+    pub fn encrypt<R: rand::RngExt + ?Sized>(
+        &self,
+        m: &Polynomial<ZqI64<Q>, N>,
+        eta: usize,
+        rng: &mut R,
+    ) -> MlweCiphertext<Q, N> {
         let m_enc = Self::encode_message(m);
-        let r = sample_poly_b_eta::<Q, N>(eta);
-        let e1 = sample_poly_b_eta::<Q, N>(eta);
-        let e2 = sample_poly_b_eta::<Q, N>(eta);
+        let r = sample_poly_b_eta::<Q, N, R>(eta, rng);
+        let e1 = sample_poly_b_eta::<Q, N, R>(eta, rng);
+        let e2 = sample_poly_b_eta::<Q, N, R>(eta, rng);
         let u = self.a.clone() * r.clone() + e1;
         let v = self.b.clone() * r + e2 + m_enc;
         MlweCiphertext { u, v }

@@ -6,12 +6,17 @@ pub mod opening;
 
 use crate::ajtai::key::AjtaiCommitmentKey;
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
-use rand::RngExt;
 
 /// Key generation: sample random A1, A2
-pub fn keygen<const Q: i64, const N: usize, const T: usize, const M: usize>()
--> AjtaiCommitmentKey<Q, N, T, M> {
-    let mut rng = rand::rng();
+pub fn keygen<
+    const Q: i64,
+    const N: usize,
+    const T: usize,
+    const M: usize,
+    R: rand::RngExt + ?Sized,
+>(
+    rng: &mut R,
+) -> AjtaiCommitmentKey<Q, N, T, M> {
     let mut a1 = Vec::with_capacity(T);
     for _ in 0..T {
         let coeffs = (0..N).map(|_| ZqI64::new(rng.random_range(0..Q))).collect();
@@ -37,7 +42,8 @@ mod tests {
         const N: usize = 4;
         const T: usize = 2;
         const M: usize = 2;
-        let key = keygen::<Q, N, T, M>();
+        let mut rng = rand::rng();
+        let key = keygen::<Q, N, T, M, _>(&mut rng);
         let m = [
             Polynomial::<ZqI64<Q>, N>::new(vec![
                 ZqI64::new(1),
@@ -52,7 +58,8 @@ mod tests {
                 ZqI64::new(8),
             ]),
         ];
-        let (com, open) = key.commit(&m);
+        let mut rng = rand::rng();
+        let (com, open) = key.commit(&m, &mut rng);
         assert!(key.verify(&m, &com, &open));
     }
 }
