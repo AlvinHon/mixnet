@@ -77,6 +77,23 @@ pub fn sample_b_eta<const Q: i64, R: rand::RngExt + ?Sized>(eta: usize, rng: &mu
     ZqI64::new(sum)
 }
 
+/// Sample a random polynomial in Zq[X]/(X^N+1)
+pub(crate) fn sample_poly<const Q: i64, const N: usize, R: rand::RngExt + ?Sized>(
+    rng: &mut R,
+) -> Polynomial<ZqI64<Q>, N> {
+    let coeffs = (0..N).map(|_| ZqI64::new(rng.random_range(0..Q))).collect();
+    Polynomial::<ZqI64<Q>, N>::new(coeffs)
+}
+
+/// Sample a polynomial with coefficients from B_eta
+pub(crate) fn sample_poly_b_eta<const Q: i64, const N: usize, R: rand::RngExt + ?Sized>(
+    eta: usize,
+    rng: &mut R,
+) -> Polynomial<ZqI64<Q>, N> {
+    let coeffs = (0..N).map(|_| sample_b_eta::<Q, R>(eta, rng)).collect();
+    Polynomial::<ZqI64<Q>, N>::new(coeffs)
+}
+
 /// Multiplies each coefficient of the polynomial with the closest integer to q/2.
 pub(crate) fn multiply_by_q_div_2<const Q: i64, const N: usize>(
     p: Polynomial<ZqI64<Q>, N>,

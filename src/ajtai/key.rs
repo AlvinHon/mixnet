@@ -1,55 +1,90 @@
-use poly_ring_xnp1::{Polynomial, zq::ZqI64};
+use poly_ring_xnp1::zq::ZqI64;
 
-use crate::ajtai::{commitment::AjtaiCommitment, opening::AjtaiCommitmentOpening};
+use crate::{
+    ajtai::{commitment::AjtaiCommitment, message::AjtaiMessage, opening::AjtaiCommitmentOpening},
+    preliminaries::{
+        algebra::{sample_poly, sample_poly_b_eta},
+        mat::Mat,
+    },
+};
 
-/// Commitment key: public matrices A1 (N x t), A2 (N x m)
-pub struct AjtaiCommitmentKey<const Q: i64, const N: usize, const T: usize, const M: usize> {
-    pub(crate) a1: [Polynomial<ZqI64<Q>, N>; T],
-    pub(crate) a2: [Polynomial<ZqI64<Q>, N>; M],
+/// Commitment key: public matrices A1 and A2 for the commitment scheme.
+/// Parameters:
+/// - Q: modulus
+/// - N: degree of polynomials
+/// - K1: number of columns in A1
+/// - K2: number of columns in A2, must be = K1 * 2
+/// - L: number of polynomials in the message vector
+pub struct AjtaiCommitmentKey<
+    const Q: i64,
+    const N: usize,
+    const K1: usize,
+    const K2: usize,
+    const L: usize,
+> {
+    pub(crate) a1: Mat<ZqI64<Q>, N, K1, L>,
+    pub(crate) a2: Mat<ZqI64<Q>, N, K1, K2>,
 }
 
-impl<const Q: i64, const N: usize, const T: usize, const M: usize> AjtaiCommitmentKey<Q, N, T, M> {
+impl<const Q: i64, const N: usize, const K1: usize, const K2: usize, const L: usize>
+    AjtaiCommitmentKey<Q, N, K1, K2, L>
+{
+    /// Key generation: sample random A1, A2
+    pub fn new<R: rand::RngExt + ?Sized>(rng: &mut R) -> Self {
+        let a1 = Mat::<ZqI64<Q>, N, K1, L>::from_fn(|| sample_poly(rng));
+        let a2 = Mat::<ZqI64<Q>, N, K1, K2>::from_fn(|| sample_poly(rng));
+        Self { a1, a2 }
+    }
+
     /// Commit to message m (vector of t polynomials), returns (commitment, opening)
     pub fn commit<R: rand::RngExt + ?Sized>(
         &self,
-        m: &[Polynomial<ZqI64<Q>, N>; T],
+        m: &AjtaiMessage<Q, N, L>,
+        eta: usize,
         rng: &mut R,
-    ) -> (AjtaiCommitment<Q, N>, AjtaiCommitmentOpening<Q, N, M>) {
-        let mut r = Vec::with_capacity(M);
-        for _ in 0..M {
-            let coeffs = (0..N).map(|_| ZqI64::new(rng.random_range(0..Q))).collect();
-            r.push(Polynomial::<ZqI64<Q>, N>::new(coeffs));
-        }
-        // c = sum_i A1_i * m_i + sum_j A2_j * r_j
-        let mut c = Polynomial::<ZqI64<Q>, N>::new(vec![ZqI64::new(0); N]);
-        for (ai, mi) in self.a1.iter().zip(m.iter()) {
-            c = c + ai.clone() * mi.clone();
-        }
-        for (aj, rj) in self.a2.iter().zip(r.iter()) {
-            c = c + aj.clone() * rj.clone();
-        }
-        (
-            AjtaiCommitment { c },
-            AjtaiCommitmentOpening {
-                r: r.try_into().unwrap(),
-            },
-        )
+    ) -> (AjtaiCommitment<Q, N, K1>, AjtaiCommitmentOpening<Q, N, K2>) {
+        let r = Mat::<ZqI64<Q>, N, K2, 1>::from_fn(|| sample_poly_b_eta(eta, rng));
+        let c = self.a1.dot(&m.m).add(&self.a2.dot(&r));
+        (AjtaiCommitment { c }, AjtaiCommitmentOpening { r })
     }
 
     /// Verify commitment
     pub fn verify(
         &self,
-        m: &[Polynomial<ZqI64<Q>, N>; T],
-        com: &AjtaiCommitment<Q, N>,
-        open: &AjtaiCommitmentOpening<Q, N, M>,
+        m: &AjtaiMessage<Q, N, L>,
+        com: &AjtaiCommitment<Q, N, K1>,
+        open: &AjtaiCommitmentOpening<Q, N, K2>,
+        eta: usize,
     ) -> bool {
-        let mut c_check = Polynomial::<ZqI64<Q>, N>::new(vec![ZqI64::new(0); N]);
-        for (ai, mi) in self.a1.iter().zip(m.iter()) {
-            c_check = c_check + ai.clone() * mi.clone();
+        Self::validate_constraint(m, open, eta) && {
+            let c_check = self.a1.dot(&m.m).add(&self.a2.dot(&open.r));
+            c_check == com.c
         }
-        for (aj, rj) in self.a2.iter().zip(open.r.iter()) {
-            c_check = c_check + aj.clone() * rj.clone();
-        }
-        c_check == com.c
+    }
+
+    /// Check the constraint in verify function:
+    /// ```text
+    /// Set B := Sqrt(n*L + n * 2 * k * η^2) and
+    /// ||(m, r)|| <= B
+    /// ```
+    fn validate_constraint(
+        m: &AjtaiMessage<Q, N, L>,
+        open: &AjtaiCommitmentOpening<Q, N, K2>,
+        eta: usize,
+    ) -> bool {
+        // combine m and r into a single vector of polynomials
+        let mut combined = Vec::with_capacity(L + K2);
+        m.m.polynomials.iter().for_each(|col| {
+            combined.extend_from_slice(col);
+        });
+        open.r.polynomials.iter().for_each(|col| {
+            combined.extend_from_slice(col);
+        });
+        // calculate the norm of the combined vector
+        let norm_squared: i64 = combined
+            .iter()
+            .map(|p| p.iter().map(|c| i64::from(c.clone()).pow(2)).sum::<i64>())
+            .sum();
+        norm_squared <= (N as i64) * (L as i64) + (N as i64) * 2 * (K2 as i64) * (eta as i64).pow(2)
     }
 }

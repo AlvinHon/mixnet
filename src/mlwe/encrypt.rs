@@ -1,8 +1,11 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
 
 use crate::{
-    mlwe::{MlweCiphertext, sample_poly_b_eta},
-    preliminaries::{algebra::multiply_by_q_div_2, mat::Mat},
+    mlwe::MlweCiphertext,
+    preliminaries::{
+        algebra::{multiply_by_q_div_2, sample_poly_b_eta},
+        mat::Mat,
+    },
 };
 
 /// MLWE public key type
