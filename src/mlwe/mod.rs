@@ -7,18 +7,18 @@ pub use decrypt::MlweSecretKey;
 pub mod encrypt;
 pub use encrypt::MlwePublicKey;
 
-use crate::preliminaries::algebra::sample_b_eta;
+use crate::preliminaries::{algebra::sample_b_eta, mat::Mat};
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
 
 /// Key generation for MLWE
-pub fn keygen<const Q: i64, const N: usize, R: rand::RngExt + ?Sized>(
+pub fn keygen<const Q: i64, const N: usize, const K: usize, R: rand::RngExt + ?Sized>(
     eta: usize,
     rng: &mut R,
-) -> (MlwePublicKey<Q, N>, MlweSecretKey<Q, N>) {
-    let a = sample_poly::<Q, N, _>(rng);
-    let s = sample_poly_b_eta::<Q, N, _>(eta, rng);
-    let e = sample_poly_b_eta::<Q, N, _>(eta, rng);
-    let b = a.clone() * s.clone() + e;
+) -> (MlwePublicKey<Q, N, K>, MlweSecretKey<Q, N, K>) {
+    let a = Mat::<ZqI64<Q>, N, K, K>::from_fn(|| sample_poly::<Q, N, _>(rng));
+    let s = Mat::<ZqI64<Q>, N, K, 1>::from_fn(|| sample_poly_b_eta::<Q, N, _>(eta, rng));
+    let e = Mat::<ZqI64<Q>, N, K, 1>::from_fn(|| sample_poly_b_eta::<Q, N, _>(eta, rng));
+    let b = a.dot(&s).add(&e);
     (MlwePublicKey { a, b }, MlweSecretKey { s })
 }
 
@@ -47,18 +47,19 @@ mod tests {
         let mut rng = rand::rng();
         const Q: i64 = 3109;
         const N: usize = 512;
+        const K: usize = 2;
         let eta = 2;
-        // Binary message
-        let m = Polynomial::<ZqI64<Q>, N>::new(vec![
-            ZqI64::new(1),
-            ZqI64::new(0),
-            ZqI64::new(1),
-            ZqI64::new(0),
-        ]);
+
         let mut failures = 0;
         let trials = 100;
         for _ in 0..trials {
-            let (pk, sk) = keygen::<Q, N, _>(eta, &mut rng);
+            // Random bnary message
+            let m = Polynomial::<ZqI64<Q>, N>::new(
+                (0..N)
+                    .map(|_| ZqI64::new(rand::random_range(0..2)))
+                    .collect(),
+            );
+            let (pk, sk) = keygen::<Q, N, K, _>(eta, &mut rng);
             let ct = pk.encrypt(&m, eta, &mut rng);
             let m_rec = sk.decrypt(&ct);
             if !m.iter().zip(m_rec.iter()).all(|(a, b)| a == b) {
@@ -67,7 +68,8 @@ mod tests {
         }
         println!("Decryption failures: {} out of {}", failures, trials);
         assert!(
-            failures <= 10, // TODO it may be too large!
+            // Given the these parameters, failure should be surprising even for the probabilistic nature of MLWE
+            failures == 0,
             "Too many decryption failures: {} out of {}",
             failures,
             trials

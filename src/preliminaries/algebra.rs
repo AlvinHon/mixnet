@@ -77,6 +77,38 @@ pub fn sample_b_eta<const Q: i64, R: rand::RngExt + ?Sized>(eta: usize, rng: &mu
     ZqI64::new(sum)
 }
 
+/// Multiplies each coefficient of the polynomial with the closest integer to q/2.
+pub(crate) fn multiply_by_q_div_2<const Q: i64, const N: usize>(
+    p: Polynomial<ZqI64<Q>, N>,
+) -> Polynomial<ZqI64<Q>, N> {
+    let q_div_2 = ZqI64::<Q>::new(Q / 2);
+    let mut p = p;
+    p.coeffs_mut(|c| *c = q_div_2.clone() * c.clone());
+    p
+}
+
+/// Converts each coefficient of the polynomial to either 0 or 1 by checking whether it
+/// is closer to 0 or q/2.
+pub(crate) fn cloest_q_div_2_to_bin<const Q: i64, const N: usize>(
+    p: Polynomial<ZqI64<Q>, N>,
+) -> Polynomial<ZqI64<Q>, N> {
+    let q_div_4 = ZqI64::<Q>::new(Q / 4);
+    let mut p = p;
+    p.coeffs_mut(|c| {
+        let abs_c = if c.clone() > ZqI64::new(0) {
+            c.clone()
+        } else {
+            ZqI64::new(0) - c.clone()
+        };
+        *c = if abs_c.gt(&q_div_4) {
+            ZqI64::new(1)
+        } else {
+            ZqI64::new(0)
+        };
+    });
+    p
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

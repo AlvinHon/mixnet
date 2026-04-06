@@ -1,5 +1,6 @@
 pub mod algebra;
 pub mod errors;
+pub mod mat;
 pub mod params;
 
 pub use algebra::{int_to_bin, is_bin, poly_from_int_bin};

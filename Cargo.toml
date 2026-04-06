@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 poly-ring-xnp1 = {version="0.3.3", features=["rand","zq"]}
 rand = "0.10"
+num = "0.4"
