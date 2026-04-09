@@ -1,62 +1,82 @@
+use num::{One, Zero};
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
 
-/// Constructs the gadget matrix G = I_n ⊗ [1, 2, ..., 2^{k-1}] as a vector of vectors.
-/// Returns a Vec<Vec<i64>> of shape (n, k).
-pub fn gadget_matrix(n: usize, k: usize) -> Vec<Vec<i64>> {
-    let mut mat = Vec::with_capacity(n);
-    for _ in 0..n {
-        let row = (0..k).map(|j| 1i64 << j).collect();
-        mat.push(row);
+/// Constructs the gadget matrix G = (I_N | 2*I_N | ... | 2^{k-2}*I_N | -2^{k-1}*I_N) as matrix of size N x (N*k).
+pub fn gadget_matrix<const N: usize, const Q: i64>(k: usize) -> Vec<Vec<Polynomial<ZqI64<Q>, N>>> {
+    let mut g = Vec::with_capacity(N);
+    for i in 0..N {
+        let mut row = Vec::with_capacity(N * k);
+        for j in 0..(N * k) {
+            let power = j / N;
+            let coeff = if power < k - 1 {
+                ZqI64::new(1 << power)
+            } else {
+                ZqI64::new(-(1 << (k - 1)))
+            };
+            if j % N == i {
+                // This is the diagonal element, set to coeff
+                let mut poly = Polynomial::<ZqI64<Q>, N>::one();
+                poly.coeffs_mut(|c| *c = coeff.clone());
+                row.push(poly);
+            } else {
+                // This is the off-diagonal element, set to 0
+                row.push(Polynomial::<ZqI64<Q>, N>::zero());
+            }
+        }
+        g.push(row);
     }
-    mat
-}
-/// Stacks a vector of binary polynomials into a single polynomial: sum_k 2^k * bin_polys[k]
-pub fn stack<const Q: i64, const N: usize>(
-    bin_polys: &[Polynomial<ZqI64<Q>, N>],
-) -> Polynomial<ZqI64<Q>, N> {
-    let mut acc = Polynomial::<ZqI64<Q>, N>::new(vec![ZqI64::new(0); N]);
-    for (k, poly) in bin_polys.iter().enumerate() {
-        let coeff = ZqI64::new(1 << k);
-        let scaled = Polynomial::<ZqI64<Q>, N>::new(
-            poly.iter().map(|c| c.clone() * coeff.clone()).collect(),
-        );
-        acc = acc + scaled;
-    }
-    acc
+    g
 }
 
-/// Decomposes a polynomial into its binary representation (per-coefficient, LSB first).
-/// Returns a vector of binary polynomials, one for each bit position (length = bits).
-pub fn ring_to_bin<const Q: i64, const N: usize>(
-    poly: &Polynomial<ZqI64<Q>, N>,
+/// Decomposes a vector of polynomials into b binary vectors whose coefficients are the binary
+/// decomposition of the coefficients of the input polynomials in two's complement form, and
+/// then stacks the b binary vectors into one vector of polynomials.
+///
+/// Combining ring_to_bin with stack in this function because in the paper, the binary vectors are always
+/// stacked after decomposition.
+///
+/// ```text
+/// E.g. [[1,2], [3,-4]] with b=3 (in range [-4, 4) ),
+/// First bit of the coefficients in [1, 2] is [1, 0] and in [3, -4] is [1, 0] (since -4 is 0b100 in two's complement).
+/// So the first output vector d(0) is [[1, 0], [1, 0]].
+/// As a result, d(1) is [[0, 1], [1, 0]] and d(2) is [[0, 0], [1, 1]].
+/// Output = stack([d(0), d(1), d(2)])
+///        = stack([[[1, 0], [1, 0]], [[0, 1], [1, 0]], [[0, 0], [1, 1]]])
+///        = [[1, 0], [1, 0], [0, 1], [1, 0], [0, 0], [1, 1]].
+/// ```
+pub fn stacked_ring_to_bin<const Q: i64, const N: usize>(
+    polys: &[Polynomial<ZqI64<Q>, N>],
     bits: usize,
 ) -> Vec<Polynomial<ZqI64<Q>, N>> {
-    let mut out = Vec::with_capacity(bits);
+    let mut bin_polys = Vec::with_capacity(polys.len() * bits);
     for k in 0..bits {
-        let coeffs = poly
-            .iter()
-            .map(|c| ZqI64::new((i64::from(c.clone()) >> k) & 1))
-            .collect();
-        out.push(Polynomial::<ZqI64<Q>, N>::new(coeffs));
+        for poly in polys {
+            let coeffs = (0..N)
+                .map(|l| {
+                    let coeff = poly.coefficient(l);
+                    let bit = (i64::from(coeff) >> k) & 1;
+                    ZqI64::new(bit)
+                })
+                .collect();
+            bin_polys.push(Polynomial::<ZqI64<Q>, N>::new(coeffs));
+        }
     }
-    out
+    bin_polys
 }
 
 /// Converts an integer to its binary representation as a vector of bits (LSB first).
-pub fn int_to_bin(mut x: u64, bits: usize) -> Vec<u64> {
-    let mut out = Vec::with_capacity(bits);
+pub fn int_to_bin<const N: usize, const Q: i64>(
+    mut x: u64,
+    bits: usize,
+) -> Polynomial<ZqI64<Q>, N> {
+    let mut coeffs = Vec::with_capacity(bits);
     for _ in 0..bits {
-        out.push(x & 1);
+        coeffs.push(ZqI64::new((x & 1) as i64));
         x >>= 1;
     }
-    out
-}
-
-/// Constructs a binary polynomial from an integer (LSB first, padded to degree N).
-pub fn poly_from_int_bin<const Q: i64, const N: usize>(x: u64) -> Polynomial<ZqI64<Q>, N> {
-    let mut coeffs = int_to_bin(x, N);
-    coeffs.truncate(N);
-    Polynomial::<ZqI64<Q>, N>::new(coeffs.into_iter().map(|b| ZqI64::new(b as i64)).collect())
+    // Pad with zeros if bits < N
+    coeffs.resize(N, ZqI64::new(0));
+    Polynomial::<ZqI64<Q>, N>::new(coeffs)
 }
 
 /// Returns true if all coefficients are 0 or 1.
@@ -91,6 +111,18 @@ pub(crate) fn sample_poly_b_eta<const Q: i64, const N: usize, R: rand::RngExt + 
     rng: &mut R,
 ) -> Polynomial<ZqI64<Q>, N> {
     let coeffs = (0..N).map(|_| sample_b_eta::<Q, R>(eta, rng)).collect();
+    Polynomial::<ZqI64<Q>, N>::new(coeffs)
+}
+
+/// Sample a polynomial with coefficients within a range
+pub(crate) fn sample_poly_range<const Q: i64, const N: usize, R: rand::RngExt + ?Sized>(
+    low: i64,
+    high: i64,
+    rng: &mut R,
+) -> Polynomial<ZqI64<Q>, N> {
+    let coeffs = (0..N)
+        .map(|_| ZqI64::new(rng.random_range(low..=high)))
+        .collect();
     Polynomial::<ZqI64<Q>, N>::new(coeffs)
 }
 
@@ -129,119 +161,106 @@ pub(crate) fn cloest_q_div_2_to_bin<const Q: i64, const N: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use poly_ring_xnp1::Polynomial;
+    use poly_ring_xnp1::{Polynomial, zqi64_vec};
 
     #[test]
     fn gadget_equation_holds() {
+        // check the formula d = G^(b)_N * stack(ring_to_bin(d, b))
         const Q: i64 = 12289;
-        let n = 4;
-        let b = 4;
-        let d = Polynomial::<ZqI64<Q>, 4>::new(vec![
-            ZqI64::new(11),
-            ZqI64::new(6),
-            ZqI64::new(15),
-            ZqI64::new(1),
-        ]);
-        let g = gadget_matrix(1, b)[0].clone();
-        let bits = ring_to_bin::<Q, 4>(&d, b);
-        let d_recovered = stack::<Q, 4>(&bits);
-        for i in 0..n {
-            let mut sum = ZqI64::<Q>::new(0);
-            for k in 0..b {
-                let bit = bits[k].iter().nth(i).unwrap_or(&ZqI64::new(0)).clone();
-                sum = sum + ZqI64::new(g[k]) * bit;
+        const N: usize = 4;
+        const B: usize = 4;
+        // All coefficients in [-8, 7] (valid for 4-bit two's complement)
+        let d = vec![
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![3, -1, 0, 5; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![0, 1, -7, 2; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![-1, 4, -3, 5; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![6, -4, 2, -5; Q]),
+        ];
+        let bin_polys = stacked_ring_to_bin::<Q, N>(&d, B);
+        let g = gadget_matrix::<N, Q>(B);
+        // compute matrix-vector product G^(b)_N * stack(ring_to_bin(d, b))
+        let mut g_stack = Vec::with_capacity(N);
+        for i in 0..N {
+            let mut sum = Polynomial::<ZqI64<Q>, N>::zero();
+            for k in 0..B {
+                let j = k * N + i;
+                sum = sum + g[i][j].clone() * bin_polys[j].clone();
             }
-            assert_eq!(sum, d.iter().nth(i).unwrap().clone());
+            g_stack.push(sum);
         }
-        for (a, b) in d.iter().zip(d_recovered.iter()) {
+        assert_eq!(g_stack.len(), d.len());
+        for (a, b) in g_stack.iter().zip(d.iter()) {
             assert_eq!(a, b);
         }
     }
 
     #[test]
     fn gadget_matrix_works() {
-        let n = 3;
-        let k = 4;
-        let mat = gadget_matrix(n, k);
-        let expected = vec![vec![1, 2, 4, 8], vec![1, 2, 4, 8], vec![1, 2, 4, 8]];
-        assert_eq!(mat, expected);
-    }
-    #[test]
-    fn stack_works() {
         const Q: i64 = 12289;
-        // bin_polys: [LSB, 2nd, 3rd, MSB]
-        let bin_polys = vec![
-            Polynomial::<ZqI64<Q>, 4>::new(vec![
-                ZqI64::new(1),
-                ZqI64::new(0),
-                ZqI64::new(1),
-                ZqI64::new(1),
-            ]),
-            Polynomial::<ZqI64<Q>, 4>::new(vec![
-                ZqI64::new(1),
-                ZqI64::new(1),
-                ZqI64::new(1),
-                ZqI64::new(0),
-            ]),
-            Polynomial::<ZqI64<Q>, 4>::new(vec![
-                ZqI64::new(0),
-                ZqI64::new(1),
-                ZqI64::new(1),
-                ZqI64::new(0),
-            ]),
-            Polynomial::<ZqI64<Q>, 4>::new(vec![
-                ZqI64::new(1),
-                ZqI64::new(0),
-                ZqI64::new(1),
-                ZqI64::new(0),
-            ]),
-        ];
-        let stacked = stack::<Q, 4>(&bin_polys);
-        let expected = vec![11, 6, 15, 1];
-        for (a, &b) in stacked.iter().zip(expected.iter()) {
-            assert_eq!(a, &ZqI64::new(b));
+        const N: usize = 4;
+        const B: usize = 4;
+        let g = gadget_matrix::<N, Q>(B);
+        assert_eq!(g.len(), N);
+        for row in g.clone() {
+            assert_eq!(row.len(), N * B);
         }
+        // Check elements of g
+        assert_eq!(
+            g[0][0],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            g[0][4],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![2, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            g[0][8],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![4, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            g[0][12],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![-8, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            g[1][1],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            g[1][5],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![2, 0, 0, 0; Q])
+        );
     }
+
     #[test]
-    fn ring_to_bin_works() {
+    fn stacked_ring_to_bin_works() {
         const Q: i64 = 12289;
-        // poly = 0b1011, 0b0110, 0b1111, 0b0001
-        let poly = Polynomial::<ZqI64<Q>, 4>::new(vec![
-            ZqI64::new(0b1011),
-            ZqI64::new(0b0110),
-            ZqI64::new(0b1111),
-            ZqI64::new(0b0001),
-        ]);
-        let bins = ring_to_bin::<Q, 4>(&poly, 4);
-        let expected = vec![
-            vec![1, 0, 1, 1],
-            vec![1, 1, 1, 0],
-            vec![0, 1, 1, 0],
-            vec![1, 0, 1, 0],
+        const N: usize = 4;
+        let polys = vec![
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 2, 0, 0; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![3, -4, 0, 0; Q]),
         ];
-        for (bin_poly, exp) in bins.iter().zip(expected) {
-            let actual: Vec<_> = bin_poly.iter().map(|x| i64::from(x.clone())).collect();
-            assert_eq!(actual, exp[..actual.len()]);
-            assert!(is_bin::<Q, 4>(bin_poly));
-        }
+        let bin_polys = stacked_ring_to_bin::<Q, N>(&polys, 3);
+        assert_eq!(bin_polys.len(), polys.len() * 3);
+        // Check the first bit of the coefficients
+        assert_eq!(
+            bin_polys[0],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            bin_polys[1],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 0, 0, 0; Q])
+        );
     }
 
     #[test]
     fn int_to_bin_works() {
-        assert_eq!(int_to_bin(0b1011, 4), vec![1, 1, 0, 1]);
-        assert_eq!(int_to_bin(0, 3), vec![0, 0, 0]);
-        assert_eq!(int_to_bin(1, 1), vec![1]);
-    }
-
-    #[test]
-    fn from_int_bin_poly() {
         const Q: i64 = 12289;
-        let poly = poly_from_int_bin::<Q, 4>(0b1011);
+        const N: usize = 4;
+        let poly = int_to_bin::<N, Q>(0b1011, 4);
         let expected = vec![1, 1, 0, 1];
         for (a, &b) in poly.iter().zip(expected.iter()) {
             assert_eq!(a, &ZqI64::new(b));
         }
-        assert!(is_bin::<Q, 4>(&poly));
     }
 
     #[test]
