@@ -7,3 +7,6 @@ edition = "2024"
 poly-ring-xnp1 = {version="0.3.3", features=["rand","zq"]}
 rand = "0.10"
 num = "0.4"
+
+[lints.clippy]
+needless_range_loop = "allow"

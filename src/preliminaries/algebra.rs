@@ -28,6 +28,35 @@ pub fn gadget_matrix<const N: usize, const Q: i64>(k: usize) -> Vec<Vec<Polynomi
     g
 }
 
+/// B^(eta) = (I | ... | I | -I | ... | -I) where there are eta I and eta -I, as a matrix of size l x (2*eta).
+pub fn binomial_matrix<const N: usize, const Q: i64>(
+    l: usize,
+    eta: usize,
+) -> Vec<Vec<Polynomial<ZqI64<Q>, N>>> {
+    let mut b = Vec::with_capacity(l);
+    for i in 0..l {
+        let mut row = Vec::with_capacity(2 * eta);
+        for j in 0..(2 * eta) {
+            let coeff = if j < eta {
+                ZqI64::new(1)
+            } else {
+                ZqI64::new(-1)
+            };
+            if j % l == i {
+                // This is the diagonal element, set to coeff
+                let mut poly = Polynomial::<ZqI64<Q>, N>::one();
+                poly.coeffs_mut(|c| *c = coeff.clone());
+                row.push(poly);
+            } else {
+                // This is the off-diagonal element, set to 0
+                row.push(Polynomial::<ZqI64<Q>, N>::zero());
+            }
+        }
+        b.push(row);
+    }
+    b
+}
+
 /// Decomposes a vector of polynomials into b binary vectors whose coefficients are the binary
 /// decomposition of the coefficients of the input polynomials in two's complement form, and
 /// then stacks the b binary vectors into one vector of polynomials.
@@ -228,6 +257,28 @@ mod tests {
         assert_eq!(
             g[1][5],
             Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![2, 0, 0, 0; Q])
+        );
+    }
+
+    #[test]
+    fn binomial_matrix_works() {
+        const Q: i64 = 3109;
+        const N: usize = 512;
+        const ETA: usize = 2;
+        let l: usize = 2;
+        let b = binomial_matrix::<N, Q>(l, ETA);
+        assert_eq!(b.len(), l);
+        for row in b.clone() {
+            assert_eq!(row.len(), 2 * ETA);
+        }
+        // Check elements of b
+        assert_eq!(
+            b[0][0],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 0, 0, 0; Q])
+        );
+        assert_eq!(
+            b[0][2],
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![-1, 0, 0, 0; Q])
         );
     }
 
