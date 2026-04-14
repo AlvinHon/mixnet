@@ -87,6 +87,32 @@ where
         }
         Mat { polynomials }
     }
+
+    pub(crate) fn flatten(&self) -> Vec<Polynomial<T, N>>
+    where
+        T: Clone,
+    {
+        self.polynomials
+            .iter()
+            .flat_map(|row| row.iter().cloned())
+            .collect()
+    }
+
+    pub(crate) fn from_flatten(vec: Vec<Polynomial<T, N>>) -> Self
+    where
+        T: Clone + One,
+        for<'a> &'a T: Add<Output = T> + Mul<Output = T> + Sub<Output = T>,
+    {
+        assert_eq!(vec.len(), K1 * K2);
+        let mut polynomials =
+            core::array::from_fn(|_| core::array::from_fn(|_| Polynomial::<T, N>::zero()));
+        for i in 0..K1 {
+            for j in 0..K2 {
+                polynomials[i][j] = vec[i * K2 + j].clone();
+            }
+        }
+        Mat { polynomials }
+    }
 }
 
 // Implement From Vec<Vec> for Mat
@@ -480,5 +506,34 @@ mod tests {
             a[1][3],
             Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![15, 16, 0, 0; Q])
         );
+    }
+
+    #[test]
+    fn test_flatten_and_flatten_back() {
+        const Q: i64 = 12289;
+        const N: usize = 4;
+        let matrix = vec![
+            vec![
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 2, 0, 0; Q]),
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![3, 4, 0, 0; Q]),
+            ],
+            vec![
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![5, 6, 0, 0; Q]),
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![7, 8, 0, 0; Q]),
+            ],
+        ];
+        let mat: Mat<ZqI64<Q>, N, 2, 2> = Mat::from(matrix.clone());
+        let flattened = mat.flatten();
+
+        let expected_flattened = vec![
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 2, 0, 0; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![3, 4, 0, 0; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![5, 6, 0, 0; Q]),
+            Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![7, 8, 0, 0; Q]),
+        ];
+        assert_eq!(flattened, expected_flattened);
+
+        let mat_back = Mat::from_flatten(flattened);
+        assert_eq!(mat.polynomials, mat_back.polynomials);
     }
 }

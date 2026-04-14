@@ -13,7 +13,7 @@ pub use message::OTSEMessage;
 mod tests {
     use poly_ring_xnp1::zq::ZqI64;
 
-    use crate::preliminaries::{algebra::sample_poly_range, mat::Mat};
+    use crate::preliminaries::{algebra::sample_poly, mat::Mat};
 
     use super::*;
 
@@ -30,7 +30,7 @@ mod tests {
         let params = OTSEParams::<Q, N, KE, Z, E, KR, L>::new(2, &mut rng);
         let key = OTSEKey::<Q, N, KE, Z, E, KR, L>::new(&mut rng);
         let m = OTSEMessage::<Q, N, L> {
-            m: Mat::<ZqI64<Q>, N, L, 1>::from_fn(|| sample_poly_range::<Q, N, _>(0, 1, &mut rng)),
+            m: Mat::<ZqI64<Q>, N, L, 1>::from_fn(|| sample_poly(&mut rng)),
         };
         let c = key.encode(&m, &params);
         let m_decoded = key.decode(&c, &params);
