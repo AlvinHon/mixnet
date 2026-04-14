@@ -21,3 +21,6 @@ Cargo.lock
 
 # Dependencies
 Cargo.lock
+
+#Ignore the paper which can be found in https://eprint.iacr.org/2025/658
+2025-658.pdf
