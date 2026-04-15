@@ -3,7 +3,7 @@
 pub mod key;
 pub use key::OTSEKey;
 pub mod params;
-pub use params::OTSEParams;
+pub use params::{OTSEParams, create_default_params};
 pub mod encoded;
 pub use encoded::OTSEEncoded;
 pub mod message;

@@ -33,7 +33,7 @@ impl<
     pub fn decrypt(
         &self,
         ciphertext: &HpkeCiphertext<Q, N, KE, KR, L>,
-    ) -> HpkeDecryptResult<Q, N, KE, Z, E, KR, L> {
+    ) -> HpkeDecryptResult<Q, N, KE, KR, L> {
         if ciphertext.c.is_empty() {
             return HpkeDecryptResult::DecryptionFailed("Ciphertext is empty".to_string());
         }
@@ -77,8 +77,6 @@ pub enum HpkeDecryptResult<
     const Q: i64,
     const N: usize,
     const KE: usize,
-    const Z: i64,
-    const E: i64,
     const KR: usize,
     const L: usize,
 > {

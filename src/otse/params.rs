@@ -34,3 +34,9 @@ impl<
         Self { eta, h, h1 }
     }
 }
+
+pub fn create_default_params<const L: usize, R: rand::RngExt + ?Sized>(
+    rng: &mut R,
+) -> OTSEParams<3109, 512, 2, 64, 16, 2, L> {
+    OTSEParams::<3109, 512, 2, 64, 16, 2, L>::new(2, rng)
+}

@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// MLWE public key type
+#[derive(Clone)]
 pub struct MlwePublicKey<const Q: i64, const N: usize, const K: usize> {
     pub(crate) a: Mat<ZqI64<Q>, N, K, K>,
     pub(crate) b: Mat<ZqI64<Q>, N, K, 1>,

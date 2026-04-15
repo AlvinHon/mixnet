@@ -7,6 +7,7 @@ use crate::{
     preliminaries::mat::Mat,
 };
 
+#[derive(Clone)]
 pub struct HpkePublicKey<
     const Q: i64,
     const N: usize,
