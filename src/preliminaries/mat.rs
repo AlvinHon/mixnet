@@ -246,16 +246,10 @@ pub fn matrix_extend_with<const Q: i64, const N: usize>(
     a: &mut [Vec<Polynomial<ZqI64<Q>, N>>],
 ) {
     let n = a.len();
-    let m = a[0].len();
     assert_eq!(
         n,
         b.len(),
         "Two matrices must have the same number of rows for extension"
-    );
-    assert_eq!(
-        m,
-        b[0].len(),
-        "Number of columns of the first matrix must be equal to the number of columns of the second matrix for extension"
     );
     for i in 0..n {
         a[i].extend_from_slice(&b[i]);
