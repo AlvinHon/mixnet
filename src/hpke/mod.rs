@@ -4,6 +4,8 @@ pub mod decrypt;
 pub use decrypt::HpkeSecretKey;
 pub mod ciphertext;
 pub use ciphertext::HpkeCiphertext;
+pub mod message;
+pub use message::HpkeMessage;
 
 pub fn keygen<
     const Q: i64,
@@ -33,7 +35,7 @@ pub fn keygen<
 
 #[cfg(test)]
 mod test {
-    use crate::{hpke::decrypt::HpkeDecryptResult, preliminaries::algebra::sample_poly};
+    use crate::hpke::decrypt::HpkeDecryptResult;
 
     use super::*;
 
@@ -78,13 +80,13 @@ mod test {
         let otse_params = crate::otse::OTSEParams::<Q, N, KE, Z, E, KR, L>::new(2, rng);
         let (pk, sk) = keygen(otse_params, rng);
 
-        let m = [sample_poly(rng), sample_poly(rng)];
+        let m = HpkeMessage::<Q, N, L>::random(rng);
         let ciphertext = pk.encrypt(&m, rng);
         let decrypt_result = sk.decrypt(&ciphertext);
         match decrypt_result {
             HpkeDecryptResult::DecryptedMessage(decrypted_m) => {
-                assert_eq!(decrypted_m[0], m[0]);
-                assert_eq!(decrypted_m[1], m[1]);
+                assert_eq!(decrypted_m[0], m.m[0]);
+                assert_eq!(decrypted_m[1], m.m[1]);
             }
             _ => panic!("Decryption failed"),
         }
@@ -106,7 +108,7 @@ mod test {
         let (pk1, sk2) = keygen(otse_params.clone(), rng);
         let (pk2, sk1) = keygen(otse_params.clone(), rng);
 
-        let m = [sample_poly(rng), sample_poly(rng)];
+        let m = HpkeMessage::<Q, N, L>::random(rng);
         let ciphertext1 = pk1.encrypt(&m, rng);
         let ciphertext2 = pk2.encrypt_next(&ciphertext1, rng);
 
@@ -119,8 +121,8 @@ mod test {
         let decrypt_result2 = sk2.decrypt(&decrypted_1);
         match decrypt_result2 {
             HpkeDecryptResult::DecryptedMessage(decrypted_m) => {
-                assert_eq!(decrypted_m[0], m[0]);
-                assert_eq!(decrypted_m[1], m[1]);
+                assert_eq!(decrypted_m[0], m.m[0]);
+                assert_eq!(decrypted_m[1], m.m[1]);
             }
             _ => panic!("Decryption failed at second layer"),
         }

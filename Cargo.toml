@@ -1,7 +1,13 @@
 [package]
 name = "mixnet"
 version = "0.1.0"
+authors = ["AlvinHon <alvin.cpp@gmail.com>"]
 edition = "2024"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/AlvinHon/mixnet"
+description = "Efficient Verifiable Mixnets from Lattices"
+
 
 [dependencies]
 poly-ring-xnp1 = {version="0.3.3", features=["rand","zq"]}

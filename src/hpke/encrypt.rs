@@ -1,7 +1,5 @@
-use poly_ring_xnp1::{Polynomial, zq::ZqI64};
-
 use crate::{
-    hpke::ciphertext::HpkeCiphertext,
+    hpke::{HpkeMessage, ciphertext::HpkeCiphertext},
     mlwe::MlwePublicKey,
     otse::{OTSEKey, OTSEMessage, OTSEParams},
     preliminaries::mat::Mat,
@@ -33,7 +31,7 @@ impl<
 {
     pub fn encrypt<R: rand::Rng + ?Sized>(
         &self,
-        m: &[Polynomial<ZqI64<Q>, N>; L],
+        m: &HpkeMessage<Q, N, L>,
         rng: &mut R,
     ) -> HpkeCiphertext<Q, N, KE, KR, L> {
         let otse_key = OTSEKey::<Q, N, KE, Z, E, KR, L>::new(rng);
@@ -41,7 +39,7 @@ impl<
         // Encrypt the message using the OTSE scheme
         let cs = {
             let m_mat = {
-                let m_vecs = m.iter().map(|m_i| vec![m_i.clone()]).collect::<Vec<_>>();
+                let m_vecs = m.m.iter().map(|m_i| vec![m_i.clone()]).collect::<Vec<_>>();
                 Mat::from(m_vecs)
             };
             otse_key.encode(&OTSEMessage::<Q, N, L> { m: m_mat }, &self.otse_params)
@@ -65,7 +63,8 @@ impl<
         ciphertext: &HpkeCiphertext<Q, N, KE, KR, L>,
         rng: &mut R,
     ) -> HpkeCiphertext<Q, N, KE, KR, L> {
-        let mut next_ciphertext = self.encrypt(&ciphertext.cs.to_polynomials(), rng);
+        let mut next_ciphertext =
+            self.encrypt(&HpkeMessage::from(ciphertext.cs.to_polynomials()), rng);
 
         // combine the first element c with the next ciphertext's c
         next_ciphertext.c.extend_from_slice(&ciphertext.c);
