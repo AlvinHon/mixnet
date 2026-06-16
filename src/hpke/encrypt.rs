@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+
 use crate::{
     hpke::{HpkeMessage, ciphertext::HpkeCiphertext},
     mlwe::MlwePublicKey,
@@ -5,7 +7,7 @@ use crate::{
     preliminaries::mat::Mat,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HpkePublicKey<
     const Q: i64,
     const N: usize,

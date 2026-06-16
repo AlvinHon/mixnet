@@ -1,4 +1,5 @@
 use poly_ring_xnp1::zq::ZqI64;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     ajtai::{commitment::AjtaiCommitment, message::AjtaiMessage, opening::AjtaiCommitmentOpening},
@@ -15,6 +16,7 @@ use crate::{
 /// - K1: number of columns in A1
 /// - K2: number of columns in A2, must be = K1 * 2
 /// - L: number of polynomials in the message vector
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AjtaiCommitmentKey<
     const Q: i64,
     const N: usize,

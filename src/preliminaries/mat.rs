@@ -269,6 +269,36 @@ pub fn matrix_change_modulus<const Q1: i64, const Q2: i64, const N: usize>(
         .collect::<Vec<_>>()
 }
 
+impl<T, const N: usize, const K1: usize, const K2: usize> serde::Serialize for Mat<T, N, K1, K2>
+where
+    T: Zero + Clone + One + serde::Serialize,
+    for<'a> &'a T: Add<Output = T> + Mul<Output = T> + Sub<Output = T>,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let vecs: Vec<Vec<Polynomial<T, N>>> =
+            self.polynomials.iter().map(|row| row.to_vec()).collect();
+        vecs.serialize(serializer)
+    }
+}
+
+impl<'de, T, const N: usize, const K1: usize, const K2: usize> serde::Deserialize<'de>
+    for Mat<T, N, K1, K2>
+where
+    T: Zero + Clone + One + serde::Deserialize<'de>,
+    for<'a> &'a T: Add<Output = T> + Mul<Output = T> + Sub<Output = T>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let vecs: Vec<Vec<Polynomial<T, N>>> = Vec::deserialize(deserializer)?;
+        Ok(Mat::from(vecs))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use poly_ring_xnp1::zqi64_vec;
@@ -529,5 +559,27 @@ mod tests {
 
         let mat_back = Mat::from_flatten(flattened);
         assert_eq!(mat.polynomials, mat_back.polynomials);
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        const Q: i64 = 12289;
+        const N: usize = 4;
+        let matrix = vec![
+            vec![
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![1, 2, 0, 0; Q]),
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![3, 4, 0, 0; Q]),
+            ],
+            vec![
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![5, 6, 0, 0; Q]),
+                Polynomial::<ZqI64<Q>, N>::new(zqi64_vec![7, 8, 0, 0; Q]),
+            ],
+        ];
+        let mat: Mat<ZqI64<Q>, N, 2, 2> = Mat::from(matrix.clone());
+
+        let serialized = serde_json::to_string(&mat).unwrap();
+        let deserialized: Mat<ZqI64<Q>, N, 2, 2> = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(mat.polynomials, deserialized.polynomials);
     }
 }

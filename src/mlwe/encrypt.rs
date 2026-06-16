@@ -1,4 +1,5 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     mlwe::MlweCiphertext,
@@ -9,7 +10,7 @@ use crate::{
 };
 
 /// MLWE public key type
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MlwePublicKey<const Q: i64, const N: usize, const K: usize> {
     pub(crate) a: Mat<ZqI64<Q>, N, K, K>,
     pub(crate) b: Mat<ZqI64<Q>, N, K, 1>,

@@ -1,9 +1,10 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::preliminaries::mat::Mat;
 
 /// MLWE ciphertext type
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MlweCiphertext<const Q: i64, const N: usize, const K: usize> {
     pub(crate) u_t: Mat<ZqI64<Q>, N, 1, K>,
     pub(crate) v: Polynomial<ZqI64<Q>, N>,

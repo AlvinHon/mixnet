@@ -1,4 +1,5 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     hpke::HpkeCiphertext,
@@ -7,6 +8,7 @@ use crate::{
     preliminaries::mat::Mat,
 };
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HpkeSecretKey<
     const Q: i64,
     const N: usize,

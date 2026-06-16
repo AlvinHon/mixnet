@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+
 use crate::{mlwe::MlweCiphertext, otse::OTSEEncoded};
 
 /// HPKE ciphertext type
@@ -7,6 +9,7 @@ use crate::{mlwe::MlweCiphertext, otse::OTSEEncoded};
 ///      = KR * (KE + 1) + L
 ///
 /// For subsequent layers of encryption, the size will be added by KR * (KE + 1) for each layer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HpkeCiphertext<
     const Q: i64,
     const N: usize,

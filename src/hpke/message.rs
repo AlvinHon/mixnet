@@ -1,4 +1,5 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
+use serde::Serialize;
 
 use crate::preliminaries::algebra::sample_poly;
 
@@ -63,5 +64,53 @@ impl<const Q: i64, const N: usize, const L: usize> TryInto<[Vec<i64>; L]> for Hp
 
         let arr = core::array::from_fn(|i| v[i].clone());
         Ok(arr)
+    }
+}
+
+impl<const Q: i64, const N: usize, const L: usize> Serialize for HpkeMessage<Q, N, L> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let m_vecs = self.m.to_vec();
+        m_vecs.serialize(serializer)
+    }
+}
+
+impl<'de, const Q: i64, const N: usize, const L: usize> serde::Deserialize<'de>
+    for HpkeMessage<Q, N, L>
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let m_vecs: Vec<Polynomial<ZqI64<Q>, N>> = Vec::deserialize(deserializer)?;
+        if m_vecs.len() != L {
+            return Err(serde::de::Error::custom(format!(
+                "Expected {} polynomials, got {}",
+                L,
+                m_vecs.len()
+            )));
+        }
+        let m = core::array::from_fn(|i| m_vecs[i].clone());
+        Ok(Self { m })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let msg = HpkeMessage::<17, 4, 2> {
+            m: [
+                Polynomial::from_coeffs(vec![1.into(), 2.into(), 3.into(), 4.into()]),
+                Polynomial::from_coeffs(vec![5.into(), 6.into(), 7.into(), 8.into()]),
+            ],
+        };
+        let serialized = serde_json::to_string(&msg).unwrap();
+        let deserialized: HpkeMessage<17, 4, 2> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(msg, deserialized);
     }
 }

@@ -1,8 +1,9 @@
 use poly_ring_xnp1::{Polynomial, zq::ZqI64};
 
 use crate::preliminaries::{algebra::sample_poly, mat::matrix_from_fn};
+use serde_derive::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OTSEParams<
     const Q: i64,
     const N: usize,
